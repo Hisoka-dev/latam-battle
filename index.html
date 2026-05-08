@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>LATAM BATTLE PRO</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+</head>
+<body>
+
+<!-- TITULO -->
+
+<div class="title">
+    🌎 LATAM BATTLE PRO
+</div>
+
+<div class="subtitle">
+    TikTok Live Gift Wars
+</div>
+
+<!-- CONFIG -->
+
+<div class="config">
+
+    <h2>⚙️ Configuración</h2>
+
+    <div class="inputs">
+
+        <input
+        id="username"
+        placeholder="Usuario TikTok">
+
+        <input
+        id="goalInput"
+        type="number"
+        value="30"
+        placeholder="Puntos para ganar">
+
+        <button onclick="connectTikTok()">
+            🔴 Conectar Live
+        </button>
+
+    </div>
+
+    <div class="status" id="status">
+        ❌ No conectado
+    </div>
+
+</div>
+
+<!-- AGREGAR PAISES -->
+
+<div class="config">
+
+    <h2>🌎 Agregar País</h2>
+
+    <div class="inputs">
+
+        <input
+        id="countryName"
+        placeholder="País">
+
+        <input
+        id="countryEmoji"
+        placeholder="🇨🇱">
+
+        <input
+        id="giftAdd"
+        placeholder="Gift sumar">
+
+        <input
+        id="giftRemove"
+        placeholder="Gift restar">
+
+        <input
+        id="countryColor"
+        placeholder="#ff4444">
+
+        <button onclick="addCountry()">
+            ➕ Agregar
+        </button>
+
+    </div>
+
+</div>
+
+<!-- TABLERO -->
+
+<div
+class="board"
+id="board">
+</div>
+
+<!-- STATS -->
+
+<div
+class="stats"
+id="stats">
+</div>
+
+<!-- WINNER -->
+
+<div
+class="winner"
+id="winner">
+
+    <h1 id="winnerText"></h1>
+
+    <p>
+        Esperando 10 segundos...
+    </p>
+
+</div>
+
+<script>
+
+const socket = io();
+
+let GOAL = 30;
+
+let winnerCooldown = false;
+
+let pendingWinner = null;
+
+const countries = [
+
+{
+    name:"Chile",
+    emoji:"🇨🇱",
+    color:"#ff4444",
+    giftAdd:"Rose",
+    giftRemove:"Galaxy",
+    points:0,
+    wins:0
+},
+
+{
+    name:"Argentina",
+    emoji:"🇦🇷",
+    color:"#59c7ff",
+    giftAdd:"IceCream",
+    giftRemove:"Galaxy",
+    points:0,
+    wins:0
+},
+
+{
+    name:"México",
+    emoji:"🇲🇽",
+    color:"#00cc88",
+    giftAdd:"Corn",
+    giftRemove:"Galaxy",
+    points:0,
+    wins:0
+}
+
+];
+
+function render(){
+
+    const board =
+    document.getElementById("board");
+
+    const stats =
+    document.getElementById("stats");
+
+    board.innerHTML = "";
+
+    stats.innerHTML = "";
+
+    countries.forEach(country=>{
+
+        let cells = "";
+
+        for(let i=0;i<GOAL;i++){
+
+            cells += `
+
+            <div
+            class="cell ${i < country.points ? 'active' : ''}"
+            style="
+            background:
+            ${i < country.points
+            ? country.color
+            : '#2a2a2a'}
+            ">
+            </div>
+
+            `;
+        }
+
+        board.innerHTML += `
+
+        <div class="row">
+
+            <div class="countryLabel">
+
+                ${country.emoji}
+                ${country.name}
+
+            </div>
+
+            <div class="grid">
+
+                ${cells}
+
+            </div>
+
+        </div>
+
+        `;
+
+        stats.innerHTML += `
+
+        <div class="card">
+
+            <h3>
+                ${country.emoji}
+                ${country.name}
+            </h3>
+
+            <p>
+                ⭐ Wins:
+                <b>${country.wins}</b>
+            </p>
+
+            <p>
+                ➕ ${country.giftAdd}
+            </p>
+
+            <p>
+                ➖ ${country.giftRemove}
+            </p>
+
+            <p>
+                🏆 ${country.points}/${GOAL}
+            </p>
+
+        </div>
+
+        `;
+    });
+
+}
+
+function gift(giftName){
+
+    countries.forEach(country=>{
+
+        // SUMAR
+
+        if(country.giftAdd === giftName){
+
+            country.points++;
+
+        }
+
+        // RESTAR
+
+        if(country.giftRemove === giftName){
+
+            country.points--;
+
+            if(country.points < 0){
+
+                country.points = 0;
+
+            }
+
+        }
+
+    });
+
+    render();
+
+    checkWinner();
+
+}
+
+function checkWinner(){
+
+    if(winnerCooldown) return;
+
+    const country = countries.find(
+    c=>c.points >= GOAL
+    );
+
+    if(!country) return;
+
+    winnerCooldown = true;
+
+    pendingWinner = country;
+
+    document.getElementById("winner")
+    .style.display = "flex";
+
+    document.getElementById("winnerText")
+    .innerHTML = `
+    ${country.emoji}
+    ${country.name}
+    CASI GANA
+    `;
+
+    setTimeout(()=>{
+
+        finalizeWinner();
+
+    },10000);
+
+}
+
+function finalizeWinner(){
+
+    if(!pendingWinner) return;
+
+    if(pendingWinner.points >= GOAL){
+
+        pendingWinner.wins++;
+
+        document.getElementById("winnerText")
+        .innerHTML = `
+        🏆
+        ${pendingWinner.emoji}
+        ${pendingWinner.name}
+        GANA
+        `;
+
+        setTimeout(()=>{
+
+            resetRound();
+
+        },3000);
+
+    }else{
+
+        document.getElementById("winner")
+        .style.display = "none";
+
+        winnerCooldown = false;
+
+        pendingWinner = null;
+
+    }
+
+    render();
+
+}
+
+function resetRound(){
+
+    countries.forEach(c=>{
+
+        c.points = 0;
+
+    });
+
+    winnerCooldown = false;
+
+    pendingWinner = null;
+
+    document.getElementById("winner")
+    .style.display = "none";
+
+    render();
+
+}
+
+function addCountry(){
+
+    const name =
+    document.getElementById("countryName").value;
+
+    const emoji =
+    document.getElementById("countryEmoji").value;
+
+    const giftAdd =
+    document.getElementById("giftAdd").value;
+
+    const giftRemove =
+    document.getElementById("giftRemove").value;
+
+    const color =
+    document.getElementById("countryColor").value;
+
+    if(!name) return;
+
+    countries.push({
+
+        name,
+        emoji,
+        giftAdd,
+        giftRemove,
+        color,
+        points:0,
+        wins:0
+
+    });
+
+    render();
+
+}
+
+function connectTikTok(){
+
+    const username =
+    document.getElementById("username")
+    .value;
+
+    GOAL = parseInt(
+    document.getElementById("goalInput")
+    .value
+    );
+
+    socket.emit("connectLive",{
+
+        username
+
+    });
+
+    document.getElementById("status")
+    .innerHTML = `
+    ✅ Conectado a @${username}
+    `;
+
+    render();
+
+}
+
+
+// =====================================================
+// RECIBIR GIFTS DESDE NODE.JS
+// =====================================================
+
+socket.on("gift",(data)=>{
+
+    gift(data.name);
+
+});
+
+render();
+
+</script>
+
+</body>
+</html>
