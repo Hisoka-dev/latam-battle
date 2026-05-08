@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>LATAM BATTLE PRO</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+</head>
+<body>
+
+<div class="title">
+🌎 LATAM BATTLE PRO
+</div>
+
+<div class="subtitle">
+TikTok Live Gift Wars
+</div>
+
+<!-- CONFIG -->
+
+<div class="config">
+
+<h2>⚙️ Configuración</h2>
+
+<div class="inputs">
+
+<input
+id="username"
+placeholder="Usuario TikTok">
+
+<input
+id="goalInput"
+type="number"
+value="30"
+placeholder="Puntos para ganar">
+
+<button onclick="connectTikTok()">
+🔴 Conectar Live
+</button>
+
+</div>
+
+<div class="status" id="status">
+❌ No conectado
+</div>
+
+</div>
+
+<!-- AGREGAR PAISES -->
+
+<div class="config">
+
+<h2>🌎 Países</h2>
+
+<div class="inputs">
+
+<input
+id="countryName"
+placeholder="País">
+
+<input
+id="countryEmoji"
+placeholder="🇨🇱">
+
+<input
+id="giftAdd"
+placeholder="Gift sumar">
+
+<button onclick="addCountry()">
+➕ Agregar País
+</button>
+
+</div>
+
+</div>
+
+<!-- TABLERO -->
+
+<div
+class="board"
+id="board">
+</div>
+
+<!-- WINNER -->
+
+<div
+class="winner"
+id="winner">
+
+<h1 id="winnerText"></h1>
+
+<p>
+Esperando 10 segundos...
+</p>
+
+</div>
+
+<script>
+
+const socket = io();
+
+let GOAL = 30;
+
+let winnerCooldown = false;
+
+let pendingWinner = null;
+
+
+// =====================================================
+// PAISES
+// =====================================================
+
+const countries = [
+
+{
+name:"Chile",
+emoji:"🇨🇱",
+giftAdd:"Rose",
+points:0,
+wins:0
+},
+
+{
+name:"Argentina",
+emoji:"🇦🇷",
+giftAdd:"GG",
+points:0,
+wins:0
+},
+
+{
+name:"México",
+emoji:"🇲🇽",
+giftAdd:"IceCream",
+points:0,
+wins:0
+}
+
+];
+
+
+// =====================================================
+// RENDER
+// =====================================================
+
+function render(){
+
+const board =
+document.getElementById("board");
+
+board.innerHTML = "";
+
+countries.forEach((country,index)=>{
+
+let cells = "";
+
+for(let i=0;i<GOAL;i++){
+
+cells += `
+
+<div
+class="cell ${i < country.points ? 'active' : ''}">
+</div>
+
+`;
+
+}
+
+board.innerHTML += `
+
+<div class="countryBox">
+
+<div class="topRow">
+
+<div class="countryLabel">
+
+${country.emoji}
+${country.name}
+
+</div>
+
+<button
+class="deleteBtn"
+onclick="removeCountry(${index})">
+
+❌
+
+</button>
+
+</div>
+
+<div class="giftInfo">
+
+➕ ${country.giftAdd}
+|
+➖ Galaxy
+
+</div>
+
+<div class="grid">
+
+${cells}
+
+</div>
+
+<div class="wins">
+
+⭐ Wins:
+${country.wins}
+
+</div>
+
+</div>
+
+`;
+
+});
+
+}
+
+
+// =====================================================
+// GIFTS
+// =====================================================
+
+function gift(giftName){
+
+console.log("🎁",giftName);
+
+countries.forEach(country=>{
+
+// SUMAR
+
+if(
+country.giftAdd.toLowerCase()
+===
+giftName.toLowerCase()
+){
+
+country.points++;
+
+}
+
+// RESTAR
+
+if(
+giftName.toLowerCase()
+===
+"galaxy"
+){
+
+country.points--;
+
+if(country.points < 0){
+
+country.points = 0;
+
+}
+
+}
+
+});
+
+render();
+
+checkWinner();
+
+}
+
+
+// =====================================================
+// WINNER
+// =====================================================
+
+function checkWinner(){
+
+if(winnerCooldown) return;
+
+const country =
+countries.find(
+c=>c.points >= GOAL
+);
+
+if(!country) return;
+
+winnerCooldown = true;
+
+pendingWinner = country;
+
+document.getElementById("winner")
+.style.display = "flex";
+
+document.getElementById("winnerText")
+.innerHTML = `
+${country.emoji}
+${country.name}
+CASI GANA
+`;
+
+setTimeout(()=>{
+
+finalizeWinner();
+
+},10000);
+
+}
+
+function finalizeWinner(){
+
+if(!pendingWinner) return;
+
+if(pendingWinner.points >= GOAL){
+
+pendingWinner.wins++;
+
+document.getElementById("winnerText")
+.innerHTML = `
+🏆
+${pendingWinner.emoji}
+${pendingWinner.name}
+GANA
+`;
+
+setTimeout(()=>{
+
+resetRound();
+
+},3000);
+
+}else{
+
+document.getElementById("winner")
+.style.display = "none";
+
+winnerCooldown = false;
+
+pendingWinner = null;
+
+}
+
+render();
+
+}
+
+function resetRound(){
+
+countries.forEach(c=>{
+
+c.points = 0;
+
+});
+
+winnerCooldown = false;
+
+pendingWinner = null;
+
+document.getElementById("winner")
+.style.display = "none";
+
+render();
+
+}
+
+
+// =====================================================
+// AGREGAR PAIS
+// =====================================================
+
+function addCountry(){
+
+const name =
+document.getElementById("countryName")
+.value;
+
+const emoji =
+document.getElementById("countryEmoji")
+.value;
+
+const giftAdd =
+document.getElementById("giftAdd")
+.value;
+
+if(!name) return;
+
+countries.push({
+
+name,
+emoji,
+giftAdd,
+points:0,
+wins:0
+
+});
+
+render();
+
+}
+
+
+// =====================================================
+// ELIMINAR PAIS
+// =====================================================
+
+function removeCountry(index){
+
+countries.splice(index,1);
+
+render();
+
+}
+
+
+// =====================================================
+// CONECTAR LIVE
+// =====================================================
+
+function connectTikTok(){
+
+const username =
+document.getElementById("username")
+.value;
+
+GOAL = parseInt(
+document.getElementById("goalInput")
+.value
+);
+
+socket.emit("connectLive",{
+
+username
+
+});
+
+document.getElementById("status")
+.innerHTML = `
+🟡 Conectando a @${username}
+`;
+
+render();
+
+}
+
+
+// =====================================================
+// SOCKET STATUS
+// =====================================================
+
+socket.on("status",(data)=>{
+
+if(data.ok){
+
+document.getElementById("status")
+.innerHTML =
+"✅ TikTok conectado";
+
+}else{
+
+document.getElementById("status")
+.innerHTML =
+"❌ Error conectando";
+
+}
+
+});
+
+
+// =====================================================
+// GIFTS RECIBIDOS
+// =====================================================
+
+socket.on("gift",(data)=>{
+
+console.log(
+"🎁 GIFT:",
+data.name
+);
+
+gift(data.name);
+
+});
+
+
+// =====================================================
+// START
+// =====================================================
+
+render();
+
+</script>
+
+</body>
+</html>
